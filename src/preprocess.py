@@ -6,7 +6,7 @@ nltk.download('stopwords')
 
 stop_words=set(stopwords.words('english'))
 
-def clean_text():
+def clean_text(text):
     if not text:
         return "" 
     
