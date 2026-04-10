@@ -29,7 +29,7 @@ if uploaded_file is not None:
         with st.spinner("Processing data... ⏳"):
 
             # Limit data (IMPORTANT)
-            df = df.head(3000)
+            df = df.head(7000)
 
             # Select column
             df = df.iloc[:, 0:1]
