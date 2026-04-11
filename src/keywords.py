@@ -1,12 +1,6 @@
-import streamlit as st
 from keybert import KeyBERT
 
-# Load model only once (IMPORTANT 🔥)
-@st.cache_resource
-def load_model():
-    return KeyBERT()
-
-kw_model = load_model()
+kw_model = KeyBERT()
 
 def extract_keywords(text):
     if not text:
