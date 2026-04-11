@@ -6,6 +6,7 @@ from wordcloud import WordCloud
 from src.preprocess import clean_text
 from src.sentiment import analyze_text
 from src.keywords import extract_keywords
+from src.ml_model import predict_sentiment
 
 # ---------------- PAGE CONFIG ---------------- #
 st.set_page_config(page_title="Sentiment Dashboard", layout="wide")
@@ -28,63 +29,76 @@ if uploaded_file is not None:
 
         with st.spinner("Processing data... ⏳"):
 
-            # Limit data (IMPORTANT)
-            df = df.head(7000)
+            # Limit data
+            df = df.head(5000)
 
-            # Select column
+            # Select first column
             df = df.iloc[:, 0:1]
             df.columns = ['review']
             df = df.dropna(subset=['review'])
 
-            # Cleaning
+            # ---------------- CLEAN TEXT ---------------- #
             df['cleaned'] = df['review'].apply(clean_text)
 
-            # Sentiment
-            df['sentiment'] = df['cleaned'].apply(lambda x: analyze_text(x)['label'])
-            df['score'] = df['cleaned'].apply(lambda x: analyze_text(x)['score'])
+            # ---------------- MODELS ---------------- #
+            # VADER (for comparison)
+            df['sentiment_vader'] = df['cleaned'].apply(
+                lambda x: analyze_text(x)['label']
+            )
 
-            # 🔥 KEY CHANGE: keywords only once
+            # YOUR ML MODEL (MAIN)
+            df['sentiment_ml'] = df['cleaned'].apply(predict_sentiment)
+
+            # ---------------- KEYWORDS ---------------- #
             all_text = " ".join(df['cleaned'])
             keywords = extract_keywords(all_text)
 
         st.success("Analysis Completed ✅")
 
-        # ---------------- METRICS ---------------- #
-        positive = (df['sentiment'] == "Positive").sum()
-        negative = (df['sentiment'] == "Negative").sum()
-        neutral = (df['sentiment'] == "Neutral").sum()
+        # ---------------- METRICS (ML MODEL) ---------------- #
+        positive = (df['sentiment_ml'] == "Positive").sum()
+        negative = (df['sentiment_ml'] == "Negative").sum()
 
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3 = st.columns(3)
 
         col1.metric("Total Reviews", len(df))
-        col2.metric("Positive", positive)
-        col3.metric("Negative", negative)
-        col4.metric("Neutral", neutral)
+        col2.metric("Positive (ML)", positive)
+        col3.metric("Negative (ML)", negative)
 
         # ---------------- FILTER ---------------- #
-        st.subheader("🔍 Filter Reviews")
+        st.subheader("🔍 Filter Reviews (ML Model)")
 
-        selected = st.selectbox("Select Sentiment", ["All", "Positive", "Negative", "Neutral"])
+        selected = st.selectbox(
+            "Select Sentiment",
+            ["All", "Positive", "Negative"]
+        )
 
         if selected != "All":
-            filtered_df = df[df['sentiment'] == selected]
+            filtered_df = df[df['sentiment_ml'] == selected]
         else:
             filtered_df = df
 
-        # ---------------- TABLE ---------------- #
+        # ---------------- DATA PREVIEW ---------------- #
         st.subheader("📊 Data Preview")
-        st.dataframe(filtered_df.head())
+        st.dataframe(filtered_df[['review', 'sentiment_vader', 'sentiment_ml']].head(10))
+
+        # ---------------- MODEL COMPARISON ---------------- #
+        st.subheader("🤖 Model Comparison")
+
+        st.dataframe(
+            df[['review', 'sentiment_vader', 'sentiment_ml']].head(10)
+        )
 
         # ---------------- CHARTS ---------------- #
         colA, colB = st.columns(2)
 
         with colA:
-            st.subheader("📈 Bar Chart")
-            st.bar_chart(df['sentiment'].value_counts())
+            st.subheader("📈 ML Model Distribution")
+            st.bar_chart(df['sentiment_ml'].value_counts())
 
         with colB:
-            st.subheader("🥧 Pie Chart")
-            counts = df['sentiment'].value_counts()
+            st.subheader("🥧 ML Model Pie Chart")
+            counts = df['sentiment_ml'].value_counts()
             fig, ax = plt.subplots()
             ax.pie(counts, labels=counts.index, autopct='%1.1f%%')
             st.pyplot(fig)
@@ -92,9 +106,7 @@ if uploaded_file is not None:
         # ---------------- WORD CLOUD ---------------- #
         st.subheader("☁️ Word Cloud")
 
-        text = " ".join(df['cleaned'])
-
-        wordcloud = WordCloud(width=800, height=400, background_color='white').generate(text)
+        wordcloud = WordCloud(width=800, height=400, background_color='white').generate(all_text)
 
         fig_wc, ax_wc = plt.subplots()
         ax_wc.imshow(wordcloud, interpolation='bilinear')
@@ -105,6 +117,17 @@ if uploaded_file is not None:
         # ---------------- KEYWORDS ---------------- #
         st.subheader("🔑 Top Keywords")
         st.write(keywords)
+
+        # ---------------- NEGATIVE INSIGHTS ---------------- #
+        st.subheader("🚨 Key Issues (Negative Feedback)")
+
+        neg_text = " ".join(df[df['sentiment_ml'] == "Negative"]['cleaned'])
+
+        if neg_text:
+            neg_keywords = extract_keywords(neg_text)
+            st.write(neg_keywords)
+        else:
+            st.write("No negative reviews found")
 
         # ---------------- SUMMARY ---------------- #
         st.subheader("🧠 Summary Insights")
