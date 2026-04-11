@@ -58,19 +58,21 @@ if uploaded_file is not None:
         # ---------------- METRICS (ML MODEL) ---------------- #
         positive = (df['sentiment_ml'] == "Positive").sum()
         negative = (df['sentiment_ml'] == "Negative").sum()
+        neutral = (df['sentiment_ml'] == "Neutral").sum()
 
-        col1, col2, col3 = st.columns(3)
+        col1, col2, col3, col4 = st.columns(4)
 
         col1.metric("Total Reviews", len(df))
-        col2.metric("Positive (ML)", positive)
-        col3.metric("Negative (ML)", negative)
+        col2.metric("Positive", positive)
+        col3.metric("Negative", negative)
+        col4.metric("Neutral", neutral)
 
         # ---------------- FILTER ---------------- #
         st.subheader("🔍 Filter Reviews (ML Model)")
 
         selected = st.selectbox(
             "Select Sentiment",
-            ["All", "Positive", "Negative"]
+            ["All", "Positive", "Negative", "Neutral"]
         )
 
         if selected != "All":
