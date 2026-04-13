@@ -24,7 +24,7 @@ with bz2.open("data/test.ft.txt.bz2", "rt", encoding="utf-8") as file:
             reviews.append(line.replace("__label__2 ", "").strip())
 
         # Limit dataset for faster training
-        if i >= 20000:
+        if i >= 50000:
             break
 
 # Convert to DataFrame
@@ -46,16 +46,22 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 # ---------------- TF-IDF (IMPROVED) ---------------- #
 vectorizer = TfidfVectorizer(
-    ngram_range=(1, 2),      # unigram + bigram
-    max_features=5000,       # limit features
-    stop_words='english'
+    ngram_range=(1, 2),      # already good
+    max_features=10000,      # increase
+    stop_words='english',
+    min_df=5,                # ignore rare words
+    max_df=0.8               # ignore very common words
 )
 
 X_train_vec = vectorizer.fit_transform(X_train)
 X_test_vec = vectorizer.transform(X_test)
 
 # ---------------- MODEL ---------------- #
-model = LogisticRegression(max_iter=1000)
+model = LogisticRegression(
+    max_iter=2000,
+    C=2,              # stronger learning
+    class_weight='balanced'
+)
 
 model.fit(X_train_vec, y_train)
 

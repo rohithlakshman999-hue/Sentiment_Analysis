@@ -17,7 +17,7 @@ def predict_sentiment(text):
     prediction = model.predict(text_vec)[0]
 
     # 🔥 Neutral logic
-    if confidence < 0.60:
+    if confidence < 0.65:
         return "Neutral"
 
     return "Positive" if prediction == 1 else "Negative"
