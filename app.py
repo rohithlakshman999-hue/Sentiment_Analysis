@@ -8,71 +8,78 @@ from src.sentiment import analyze_text
 from src.keywords import extract_keywords
 from src.ml_model import predict_sentiment
 
-# ---------------- PAGE CONFIG ---------------- #
 st.set_page_config(page_title="Sentiment Dashboard", layout="wide")
 
 st.title("💬 Customer Sentiment Dashboard")
 st.markdown("Analyze customer feedback with AI insights 🚀")
 
-# ---------------- CACHE DATA ---------------- #
 @st.cache_data
 def load_data(file):
     return pd.read_csv(file)
 
-uploaded_file = st.file_uploader("Upload your CSV file", type=["csv"])
+uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
 
-if uploaded_file is not None:
+if uploaded_file:
 
     df = load_data(uploaded_file)
 
     if st.button("Start Analysis 🚀"):
 
-        with st.spinner("Processing data... ⏳"):
+        with st.spinner("Processing... ⏳"):
 
-            # Limit data
-            df = df.head(7000)
-
-            # Select first column
+            df = df.head(5000)
             df = df.iloc[:, 0:1]
             df.columns = ['review']
-            df = df.dropna(subset=['review'])
+            df = df.dropna()
 
-            # ---------------- CLEAN TEXT ---------------- #
+            # -------- CLEAN -------- #
             df['cleaned'] = df['review'].apply(clean_text)
 
-            # ---------------- MODELS ---------------- #
-            # VADER (for comparison)
+            # -------- MODELS -------- #
             df['sentiment_vader'] = df['cleaned'].apply(
                 lambda x: analyze_text(x)['label']
             )
 
-            # YOUR ML MODEL (MAIN)
             df['sentiment_ml'] = df['cleaned'].apply(predict_sentiment)
 
-            # ---------------- KEYWORDS ---------------- #
+            df['match'] = df['sentiment_vader'] == df['sentiment_ml']
+
+            # -------- KEYWORDS -------- #
             all_text = " ".join(df['cleaned'])
             keywords = extract_keywords(all_text)
 
         st.success("Analysis Completed ✅")
 
-        # ---------------- METRICS (ML MODEL) ---------------- #
-        positive = (df['sentiment_ml'] == "Positive").sum()
-        negative = (df['sentiment_ml'] == "Negative").sum()
-        neutral = (df['sentiment_ml'] == "Neutral").sum()
+        # -------- METRICS -------- #
+        pos = (df['sentiment_ml'] == "Positive").sum()
+        neg = (df['sentiment_ml'] == "Negative").sum()
+        neu = (df['sentiment_ml'] == "Neutral").sum()
 
         col1, col2, col3, col4 = st.columns(4)
-
         col1.metric("Total Reviews", len(df))
-        col2.metric("Positive", positive)
-        col3.metric("Negative", negative)
-        col4.metric("Neutral", neutral)
+        col2.metric("Positive", pos)
+        col3.metric("Negative", neg)
+        col4.metric("Neutral", neu)
 
-        # ---------------- FILTER ---------------- #
-        st.subheader("🔍 Filter Reviews (ML Model)")
+        # -------- AGREEMENT -------- #
+        st.subheader("📊 Model Agreement")
+        agreement = df['match'].mean()
+        st.write(f"Agreement: {agreement*100:.2f}%")
+
+        # -------- DISAGREEMENT -------- #
+        st.subheader("⚠️ Disagreement Cases")
+        st.dataframe(
+            df[df['match'] == False][
+                ['review','sentiment_vader','sentiment_ml']
+            ].head(10)
+        )
+
+        # -------- FILTER -------- #
+        st.subheader("🔍 Filter Reviews")
 
         selected = st.selectbox(
             "Select Sentiment",
-            ["All", "Positive", "Negative", "Neutral"]
+            ["All","Positive","Negative","Neutral"]
         )
 
         if selected != "All":
@@ -80,75 +87,66 @@ if uploaded_file is not None:
         else:
             filtered_df = df
 
-        # ---------------- DATA PREVIEW ---------------- #
-        st.subheader("📊 Data Preview")
-        st.dataframe(filtered_df[['review', 'sentiment_vader', 'sentiment_ml']].head(10))
+        st.dataframe(filtered_df.head(10))
 
-        # ---------------- MODEL COMPARISON ---------------- #
-        st.subheader("🤖 Model Comparison")
+        # -------- COMPARISON GRAPHS 🔥 -------- #
+        st.subheader("📊 Model Comparison")
 
-        st.dataframe(
-            df[['review', 'sentiment_vader', 'sentiment_ml']].head(10)
-        )
-
-        # ---------------- CHARTS ---------------- #
         colA, colB = st.columns(2)
 
         with colA:
-            st.subheader("📈 ML Model Distribution")
-            st.bar_chart(df['sentiment_ml'].value_counts())
+            st.markdown("### 🔵 VADER")
+            vader_counts = df['sentiment_vader'].value_counts()
+            st.bar_chart(vader_counts)
 
         with colB:
-            st.subheader("🥧 ML Model Pie Chart")
-            counts = df['sentiment_ml'].value_counts()
-            fig, ax = plt.subplots()
-            ax.pie(counts, labels=counts.index, autopct='%1.1f%%')
-            st.pyplot(fig)
+            st.markdown("### 🟢 ML Model")
+            ml_counts = df['sentiment_ml'].value_counts()
+            st.bar_chart(ml_counts)
 
-        # ---------------- WORD CLOUD ---------------- #
+        # -------- PIE CHART -------- #
+        st.subheader("🥧 Pie Comparison")
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            fig1, ax1 = plt.subplots()
+            ax1.pie(vader_counts, labels=vader_counts.index, autopct='%1.1f%%')
+            st.pyplot(fig1)
+
+        with col2:
+            fig2, ax2 = plt.subplots()
+            ax2.pie(ml_counts, labels=ml_counts.index, autopct='%1.1f%%')
+            st.pyplot(fig2)
+
+        # -------- WORD CLOUD -------- #
         st.subheader("☁️ Word Cloud")
 
-        wordcloud = WordCloud(width=800, height=400, background_color='white').generate(all_text)
+        wc = WordCloud(width=800, height=400, background_color='white').generate(all_text)
+        st.image(wc.to_array())
 
-        fig_wc, ax_wc = plt.subplots()
-        ax_wc.imshow(wordcloud, interpolation='bilinear')
-        ax_wc.axis("off")
-
-        st.pyplot(fig_wc)
-
-        # ---------------- KEYWORDS ---------------- #
-        st.subheader("🔑 Top Keywords")
+        # -------- KEYWORDS -------- #
+        st.subheader("🔑 Keywords")
         st.write(keywords)
 
-        # ---------------- NEGATIVE INSIGHTS ---------------- #
-        st.subheader("🚨 Key Issues (Negative Feedback)")
-
-        neg_text = " ".join(df[df['sentiment_ml'] == "Negative"]['cleaned'])
-
-        if neg_text:
-            neg_keywords = extract_keywords(neg_text)
-            st.write(neg_keywords)
-        else:
-            st.write("No negative reviews found")
-
-        # ---------------- SUMMARY ---------------- #
-        st.subheader("🧠 Summary Insights")
+        # -------- SUMMARY -------- #
+        st.subheader("🧠 Summary")
 
         total = len(df)
 
-        if positive > negative:
-            st.success(f"{(positive/total)*100:.1f}% customers are satisfied.")
-        elif negative > positive:
-            st.error(f"{(negative/total)*100:.1f}% customers reported issues.")
+        if pos > neg:
+            st.success(f"{(pos/total)*100:.1f}% customers satisfied")
+        elif neg > pos:
+            st.error(f"{(neg/total)*100:.1f}% negative feedback")
         else:
-            st.warning("Customer sentiment is balanced.")
+            st.warning("Mixed sentiment")
 
-        # ---------------- DOWNLOAD ---------------- #
+        # -------- DOWNLOAD -------- #
         csv = df.to_csv(index=False).encode('utf-8')
 
         st.download_button(
             "📥 Download Results",
-            data=csv,
+            data=csv,   
             file_name="sentiment_analysis.csv",
             mime="text/csv"
         )
