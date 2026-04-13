@@ -27,7 +27,7 @@ if uploaded_file:
 
         with st.spinner("Processing... ⏳"):
 
-            df = df.head(5000)
+            df = df.head(10000)
             df = df.iloc[:, 0:1]
             df.columns = ['review']
             df = df.dropna()
